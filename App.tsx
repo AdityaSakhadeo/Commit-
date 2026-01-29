@@ -4,6 +4,7 @@ import { MobileContainer, Header } from './components/Layout';
 import { BottomNav } from './components/BottomNav';
 import { PartyPopper, Gift, X } from 'lucide-react';
 import { SplashScreen } from './components/SplashScreen';
+import { StorageService } from './services/storageService';
 
 // Screens
 import Onboarding from './screens/Onboarding';
@@ -14,55 +15,6 @@ import CreatePost from './screens/CreatePost';
 import GoalDetail from './screens/GoalDetail';
 import Rewards from './screens/Rewards';
 import Profile from './screens/Profile';
-
-// Mock Data
-const MOCK_USER: User = {
-  id: 'u1',
-  name: 'Alex Rivera',
-  bio: 'Building better habits, one day at a time.',
-  avatar: 'https://picsum.photos/200',
-  stats: {
-    goalsCompleted: 3,
-    currentStreak: 12,
-    totalDays: 45
-  }
-};
-
-const MOCK_POSTS: Post[] = [
-  {
-    id: 'p1',
-    userId: 'u2',
-    userName: 'Sarah Jenkins',
-    userAvatar: 'https://picsum.photos/201',
-    domain: 'Fitness',
-    type: 'UPDATE',
-    content: 'Just finished my 5k run! Feeling exhausted but accomplished. 🏃‍♀️💨',
-    likes: 24,
-    comments: 4,
-    timestamp: '2h ago',
-    progressUpdate: 65,
-    image: 'https://picsum.photos/800/600'
-  },
-  {
-    id: 'p2',
-    userId: 'u3',
-    userName: 'Mike Chen',
-    userAvatar: 'https://picsum.photos/202',
-    domain: 'Learning',
-    type: 'STARTED',
-    content: 'Starting my journey to learn Python today. Wish me luck!',
-    likes: 56,
-    comments: 12,
-    timestamp: '5h ago'
-  }
-];
-
-const MOCK_REWARDS: Reward[] = [
-  { id: 'r1', title: 'Free Espresso', brand: 'Coffee House', logo: '☕', validity: 'Valid 7 Days', unlocked: true },
-  { id: 'r2', title: '20% Off Gym Gear', brand: 'FitStore', logo: '💪', validity: 'Valid 30 Days', unlocked: true },
-  { id: 'r3', title: 'Free Audiobook', brand: 'Audible', logo: '🎧', validity: 'Locked', unlocked: false },
-  { id: 'r4', title: 'Healthy Meal Box', brand: 'FreshEats', logo: '🥗', validity: 'Locked', unlocked: false },
-];
 
 // Simple confetti component replacement
 const ConfettiRain = () => (
@@ -92,77 +44,128 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(Screen.ONBOARDING);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [activeGoal, setActiveGoal] = useState<Goal | null>(null);
-  const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
+  
+  // State initialized as empty, populated via useEffect
+  const [posts, setPosts] = useState<Post[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [rewards, setRewards] = useState<Reward[]>(MOCK_REWARDS);
-  const [user, setUser] = useState<User>(MOCK_USER);
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  
   const [showCelebration, setShowCelebration] = useState(false);
   const [justCompletedGoal, setJustCompletedGoal] = useState<Goal | null>(null);
 
-  // Simulate initial loading
+  // Initialize Data Layer
   useEffect(() => {
+    // Initialize storage (seed data if needed)
+    StorageService.init();
+
+    const loadData = () => {
+      const storedUser = StorageService.getUser();
+      const storedGoals = StorageService.getGoals();
+      const storedPosts = StorageService.getPosts();
+      const storedRewards = StorageService.getRewards();
+
+      setUser(storedUser);
+      setGoals(storedGoals);
+      setPosts(storedPosts);
+      setRewards(storedRewards);
+
+      // Determine initial screen based on data
+      if (storedGoals.length > 0) {
+        setScreen(Screen.HOME);
+      }
+    };
+
+    loadData();
+
+    // Fake loading delay for splash screen
     const timer = setTimeout(() => {
       setLoading(false);
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
 
+  // Sync helpers
+  const updateUser = (newUser: User) => {
+    setUser(newUser);
+    StorageService.saveUser(newUser);
+  };
+
+  const updateGoals = (newGoals: Goal[]) => {
+    setGoals(newGoals);
+    StorageService.saveGoals(newGoals);
+  };
+
+  const updatePosts = (newPosts: Post[]) => {
+    setPosts(newPosts);
+    StorageService.savePosts(newPosts);
+  };
+
+  const updateRewards = (newRewards: Reward[]) => {
+    setRewards(newRewards);
+    StorageService.saveRewards(newRewards);
+  };
+
+
   // Helper to add a goal
   const handleAddGoal = (goal: Goal) => {
-    setGoals(prev => [goal, ...prev]);
+    const newGoals = [goal, ...goals];
+    updateGoals(newGoals);
     setActiveGoal(goal);
     
     // Auto-create a "Started" post
-    const newPost: Post = {
-      id: Date.now().toString(),
-      userId: user.id,
-      userName: user.name,
-      userAvatar: user.avatar,
-      domain: goal.domain,
-      type: 'STARTED',
-      content: `I just committed to a new goal: ${goal.title}. Let's do this! 💪`,
-      likes: 0,
-      comments: 0,
-      timestamp: 'Just now'
-    };
-    setPosts(prev => [newPost, ...prev]);
+    if (user) {
+      const newPost: Post = {
+        id: Date.now().toString(),
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar,
+        domain: goal.domain,
+        type: 'STARTED',
+        content: `I just committed to a new goal: ${goal.title}. Let's do this! 💪`,
+        likes: 0,
+        comments: 0,
+        timestamp: 'Just now'
+      };
+      updatePosts([newPost, ...posts]);
+    }
     setScreen(Screen.HOME);
   };
 
   const handlePostCreate = (post: Post) => {
-    setPosts(prev => [post, ...prev]);
+    updatePosts([post, ...posts]);
     setScreen(Screen.HOME);
   };
 
   const handleTaskToggle = (goalId: string, taskId: string) => {
+    if (!user) return;
+
     let goalCompleted = false;
     let completedGoalObj: Goal | null = null;
+    let newRewards = [...rewards];
+    let newUser = { ...user };
 
-    setGoals(prevGoals => {
-      return prevGoals.map(goal => {
-        if (goal.id !== goalId) return goal;
+    const newGoals = goals.map(goal => {
+      if (goal.id !== goalId) return goal;
 
-        const updatedTasks = goal.tasks.map(t =>
-          t.id === taskId ? { ...t, completed: !t.completed } : t
-        );
+      const updatedTasks = goal.tasks.map(t =>
+        t.id === taskId ? { ...t, completed: !t.completed } : t
+      );
 
-        const completedCount = updatedTasks.filter(t => t.completed).length;
-        const progress = Math.round((completedCount / updatedTasks.length) * 100);
+      const completedCount = updatedTasks.filter(t => t.completed).length;
+      const progress = Math.round((completedCount / updatedTasks.length) * 100);
 
-        // Streak Logic: If we toggle a task to TRUE, increment streak if it wasn't already incremented? 
-        // For simplicity: specific streak logic can be complex, here we just check if progress improved.
-        const taskJustCompleted = updatedTasks.find(t => t.id === taskId)?.completed;
-        const newStreak = taskJustCompleted ? goal.streak + 1 : Math.max(0, goal.streak - 1);
+      const taskJustCompleted = updatedTasks.find(t => t.id === taskId)?.completed;
+      const newStreak = taskJustCompleted ? goal.streak + 1 : Math.max(0, goal.streak - 1);
 
-        const updatedGoal = { ...goal, tasks: updatedTasks, progress, streak: newStreak, completed: progress === 100 };
+      const updatedGoal = { ...goal, tasks: updatedTasks, progress, streak: newStreak, completed: progress === 100 };
 
-        if (progress === 100 && goal.progress < 100) {
-          goalCompleted = true;
-          completedGoalObj = updatedGoal;
-        }
+      if (progress === 100 && goal.progress < 100) {
+        goalCompleted = true;
+        completedGoalObj = updatedGoal;
+      }
 
-        return updatedGoal;
-      });
+      return updatedGoal;
     });
 
     if (goalCompleted && completedGoalObj) {
@@ -170,48 +173,47 @@ export default function App() {
       setShowCelebration(true);
       
       // Unlock reward logic
-      setRewards(prev => {
-        const locked = prev.filter(r => !r.unlocked);
-        if (locked.length > 0) {
-          const toUnlock = locked[0];
-          return prev.map(r => r.id === toUnlock.id ? { ...r, unlocked: true } : r);
-        }
-        return prev;
-      });
+      const locked = newRewards.filter(r => !r.unlocked);
+      if (locked.length > 0) {
+        const toUnlock = locked[0];
+        newRewards = newRewards.map(r => r.id === toUnlock.id ? { ...r, unlocked: true } : r);
+        updateRewards(newRewards);
+      }
       
-      setUser(prev => ({
-        ...prev,
-        stats: {
-          ...prev.stats,
-          goalsCompleted: prev.stats.goalsCompleted + 1
-        }
-      }));
+      newUser.stats.goalsCompleted += 1;
+      updateUser(newUser);
     }
+
+    updateGoals(newGoals);
   };
 
   const handleUpdateDayTasks = (goalId: string, dayNumber: number, newTasks: string[]) => {
-    setGoals(prevGoals => {
-      return prevGoals.map(goal => {
-        if (goal.id !== goalId) return goal;
+    const newGoals = goals.map(goal => {
+      if (goal.id !== goalId) return goal;
 
-        // Filter OUT the old tasks for this specific day
-        const prefix = `Day ${dayNumber}`;
-        const otherTasks = goal.tasks.filter(t => !t.title.startsWith(`${prefix}:`) && !t.title.startsWith(`${prefix} `));
+      // Filter OUT the old tasks for this specific day
+      // Robust filtering to catch "Day X: ..." and "Day X (Title): ..."
+      const prefix = `Day ${dayNumber}`;
+      const otherTasks = goal.tasks.filter(t => !t.title.startsWith(`${prefix}:`) && !t.title.startsWith(`${prefix} `));
 
-        // Create new tasks objects
-        const addedTasks: Task[] = newTasks.map((txt, idx) => ({
-          id: `t-updated-${Date.now()}-${idx}`,
-          title: `Day ${dayNumber}: ${txt}`,
-          completed: false
-        }));
+      // Create new tasks objects
+      const addedTasks: Task[] = newTasks.map((txt, idx) => ({
+        id: `t-updated-${Date.now()}-${idx}`,
+        title: `Day ${dayNumber}: ${txt}`,
+        completed: false
+      }));
 
-        const updatedTasks = [...otherTasks, ...addedTasks];
-        // Sort to keep order? simplified: just appending/filtering is risky for order, but functionally ok.
-        // Better to insert them where the old ones were? Too complex for this demo. Appending is fine as long as list view sorts or filters correctly.
-
-        return { ...goal, tasks: updatedTasks };
-      });
+      // Find where to insert them roughly (optional, appending is simpler)
+      const updatedTasks = [...otherTasks, ...addedTasks];
+      
+      return { ...goal, tasks: updatedTasks };
     });
+
+    updateGoals(newGoals);
+    // Also update active goal reference if it's the one being modified
+    if (activeGoal && activeGoal.id === goalId) {
+       setActiveGoal(newGoals.find(g => g.id === goalId) || null);
+    }
   };
 
   const closeCelebration = (goToRewards: boolean) => {
@@ -229,6 +231,8 @@ export default function App() {
   };
 
   const renderScreen = () => {
+    if (!user) return null; // Should be loaded by the time loading=false
+
     switch (screen) {
       case Screen.ONBOARDING:
         return <Onboarding onStart={() => setScreen(Screen.GOAL_SELECTION)} />;
@@ -271,9 +275,11 @@ export default function App() {
           />
         );
       case Screen.GOAL_DETAIL:
-        return activeGoal ? (
+        // Ensure we pass the latest version of the goal from the goals array
+        const currentActiveGoal = goals.find(g => g.id === activeGoal?.id) || activeGoal;
+        return currentActiveGoal ? (
           <GoalDetail 
-            goal={goals.find(g => g.id === activeGoal.id) || activeGoal} 
+            goal={currentActiveGoal} 
             onToggleTask={handleTaskToggle}
             onBack={() => setScreen(Screen.HOME)}
             onUpdateTasks={handleUpdateDayTasks}
