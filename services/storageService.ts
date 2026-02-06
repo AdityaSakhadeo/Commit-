@@ -25,7 +25,7 @@ export const SEED_USER: User = {
 };
 
 const SEED_REWARDS: Reward[] = [
-  { id: 'r1', title: 'Free Espresso', brand: 'Coffee House', logo: '☕', validity: 'Valid 7 Days', unlocked: true },
+  { id: 'r1', title: 'Free Espresso', brand: 'COEP Canteen', logo: '☕', validity: 'Valid 7 Days', unlocked: true },
   { id: 'r2', title: '20% Off Gym Gear', brand: 'FitStore', logo: '💪', validity: 'Valid 30 Days', unlocked: true },
   { id: 'r3', title: 'Free Audiobook', brand: 'Audible', logo: '🎧', validity: 'Locked', unlocked: false },
   { id: 'r4', title: 'Healthy Meal Box', brand: 'FreshEats', logo: '🥗', validity: 'Locked', unlocked: false },
@@ -46,6 +46,24 @@ const SEED_POSTS: Post[] = [
       comments: 5,
       timestamp: '2026-01-01T00:00:00Z',
       progressUpdate: 5,
+  }
+]
+
+const SEED_GOALS: Goal[] = [
+  {
+      id: '1',
+      title: 'Walk 10,000 Steps Daily',
+      domain: 'Fitness',
+      progress: 10, // 0 to 100
+      tasks: [{id : 't1', title: 'Morning Walk', completed: true}],
+      streak: 2,
+      completed:false,
+      startDate: '2026-01-01',
+      totalSkipsAllowed: 1,
+      skippedDates: ['2026-01-01'],  // ISO date strings of days that were skipped/shifted
+      // Helper for streak calculation (optional persistence, mostly computed)
+      completedDayNumbers: [1, 2, 3], 
+
   }
 ]
 class LocalDatabase {
@@ -146,6 +164,10 @@ class LocalDatabase {
   // --- Utility ---
   init() {
     // If we want to seed initial posts only on first run ever:
+    if (this.data.goals.length === 0) {
+      this.data.goals = SEED_GOALS;
+      this.save();
+    }
     if (this.data.posts.length === 0) {
       this.data.posts = SEED_POSTS;
       this.save();
@@ -164,6 +186,7 @@ export const StorageService = {
   
   getGoals: () => db.getGoals(),
   saveGoals: (goals: Goal[]) => {
+
     // This method exists for backward compatibility with App.tsx bulk updates, 
     // but ideally we use updateGoal individually.
     // We'll just replace the whole array for now to match App logic.
