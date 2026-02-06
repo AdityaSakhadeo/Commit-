@@ -29,6 +29,41 @@ const getDomainColor = (domain: Domain) => {
   }
 };
 
+const getRelativeTimeLabel = (timestamp: string): string => {
+  const date = new Date(timestamp);
+
+  // Fallback to original string if we can't parse a real date
+  if (isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+
+  // Treat anything within a few seconds as "Just now"
+  if (diffMs < 5000) {
+    return 'Just now';
+  }
+
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `${diffSec}s`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}min`;
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 4) return `${diffWeeks}w`;
+
+  const diffMonths = Math.floor(diffDays / 30);
+  return `${diffMonths}m`;
+};
+
 const StoriesRail: React.FC<{ user: User }> = ({ user }) => (
   <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 py-4 pb-2">
     {/* My Story */}
@@ -162,13 +197,25 @@ const PostCard: React.FC<{ post: Post; onEncourage: () => void }> = ({ post, onE
   const isStarted = post.type === 'STARTED';
   const isCompleted = post.type === 'COMPLETED';
 
+  const [relativeTime, setRelativeTime] = React.useState<string>(() =>
+    getRelativeTimeLabel(post.timestamp)
+  );
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      setRelativeTime(getRelativeTimeLabel(post.timestamp));
+    }, 30000); // update every 30 seconds instead of every second
+
+    return () => window.clearInterval(interval);
+  }, [post.timestamp]);
+
   return (
     <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 mb-4 fade-in">
       <div className="flex items-center gap-3 mb-4">
         <img src={post.userAvatar} alt={post.userName} className="w-10 h-10 rounded-full object-cover border border-slate-100 shadow-sm" />
         <div className="flex-1">
-           <h3 className="font-bold text-slate-900 text-sm">{post.userName}</h3>
-           <p className="text-xs text-slate-400 font-medium">{post.timestamp}</p>
+          <h3 className="font-bold text-slate-900 text-sm">{post.userName}</h3>
+          <p className="text-xs text-slate-400 font-medium">{relativeTime}</p>
         </div>
         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border 
           ${isStarted ? 'bg-blue-50 text-blue-600 border-blue-100' : isCompleted ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>

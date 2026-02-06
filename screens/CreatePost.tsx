@@ -32,7 +32,7 @@ export default function CreatePost({ user, activeGoals, onPost, onCancel }: Crea
       content,
       likes: 0,
       comments: 0,
-      timestamp: 'Just now',
+      timestamp: new Date().toISOString(),
       progressUpdate: selectedGoal.progress,
       image: hasImage ? (postType === 'COMPLETED' ? 'https://picsum.photos/id/102/800/600' : 'https://picsum.photos/id/180/800/600') : undefined
     };
