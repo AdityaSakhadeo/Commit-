@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Goal } from '../types';
 import { Settings, Award, Flame, Target, Award as AwardIcon, ChevronRight } from 'lucide-react';
 
@@ -6,10 +6,86 @@ interface ProfileProps {
   user: User;
   goals: Goal[];
   onGoalSelect?: (goal: Goal) => void;
+  onUserUpdate?: (user: User) => void;
 }
 
-export default function Profile({ user, goals, onGoalSelect }: ProfileProps) {
+export default function Profile({ user, goals, onGoalSelect, onUserUpdate }: ProfileProps) {
   const [activeTab, setActiveTab] = useState<'GOALS' | 'HISTORY'>('GOALS');
+  const [newHobby, setNewHobby] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const [localHobbies, setLocalHobbies] = useState<string[]>(user.hobbies || []);
+
+  // Keep local view in sync with persisted user
+  useEffect(() => {
+    setLocalHobbies(user.hobbies || []);
+  }, [user.hobbies]);
+
+  const hobbies = localHobbies;
+
+  const baseSuggestions = [
+    'Running',
+    'Yoga',
+    'Gym',
+    'Cycling',
+    'Meditation',
+    'Reading',
+    'Writing',
+    'Cooking',
+    'Photography',
+    'Gaming',
+  ];
+
+  // Light "AI" flavour: prioritize by domains and text match
+  const domainKeywords = goals.map((g) => g.domain);
+  const rawSuggestions = baseSuggestions.filter((s) => !hobbies.includes(s));
+
+  const filteredSuggestions = rawSuggestions
+    .filter((s) =>
+      newHobby.trim()
+        ? s.toLowerCase().includes(newHobby.trim().toLowerCase())
+        : true
+    )
+    .sort((a, b) => {
+      const aBoost =
+        domainKeywords.some((d) =>
+          a.toLowerCase().includes(d.toLowerCase().slice(0, 3))
+        ) ? 1 : 0;
+      const bBoost =
+        domainKeywords.some((d) =>
+          b.toLowerCase().includes(d.toLowerCase().slice(0, 3))
+        ) ? 1 : 0;
+      return bBoost - aBoost;
+    })
+    .slice(0, 6);
+
+  const handleAddHobby = () => {
+    const value = newHobby.trim();
+    if (!value) return;
+    if (hobbies.includes(value)) {
+      setNewHobby('');
+      return;
+    }
+
+    const nextHobbies = [...hobbies, value];
+
+    const updatedUser: User = {
+      ...user,
+      hobbies: nextHobbies,
+    };
+
+    onUserUpdate?.(updatedUser);
+    setLocalHobbies(nextHobbies);
+    setNewHobby('');
+    setShowSuggestions(false);
+  };
+
+  const handleHobbyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddHobby();
+    }
+  };
 
   return (
     <div className="min-h-full bg-slate-50 pb-20">
@@ -51,6 +127,110 @@ export default function Profile({ user, goals, onGoalSelect }: ProfileProps) {
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Done</div>
               </div>
            </div>
+        </div>
+        
+        {/* Hobbies / Interests */}
+        <div className="px-6 mt-4 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-[0.16em]">
+              Hobbies & Interests
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {hobbies.length === 0 ? (
+              <span className="text-xs text-slate-400">
+                Add a few tags like &quot;Running&quot;, &quot;Guitar&quot;, or &quot;Cooking&quot;.
+              </span>
+            ) : (
+              hobbies.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium border border-teal-100"
+                >
+                  {tag}
+                </span>
+              ))
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={newHobby}
+                onChange={(e) => {
+                  setNewHobby(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onKeyDown={handleHobbyKeyDown}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => {
+                  // Delay closing so click can register
+                  setTimeout(() => setShowSuggestions(false), 120);
+                }}
+                placeholder="Add a hobby tag"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/60 focus:border-teal-500 bg-slate-50"
+              />
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-[0.16em]">
+                    AI suggestions
+                  </div>
+                  {hobbies.length > 0 && (
+                    <div className="px-3 pb-1">
+                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.16em] mb-1">
+                        Your tags
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {hobbies.map((tag) => (
+                          <span
+                            key={`current-${tag}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-[11px] border border-slate-200"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {filteredSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        // add immediately
+                        if (hobbies.includes(suggestion)) {
+                          setShowSuggestions(false);
+                          return;
+                        }
+                        const nextHobbies = [...hobbies, suggestion];
+                        const updatedUser: User = {
+                          ...user,
+                          hobbies: nextHobbies,
+                        };
+                        onUserUpdate?.(updatedUser);
+                        setLocalHobbies(nextHobbies);
+                        setNewHobby('');
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-teal-50"
+                    >
+                      <span>{suggestion}</span>
+                      <span className="text-[10px] uppercase text-teal-500 font-semibold">
+                        Add
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleAddHobby}
+              className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!newHobby.trim()}
+            >
+              Add
+            </button>
+          </div>
         </div>
       </div>
 

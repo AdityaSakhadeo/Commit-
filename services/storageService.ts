@@ -13,6 +13,7 @@ const SEED_USER: User = {
   name: 'Alex Rivera',
   bio: 'Building better habits, one day at a time.',
   avatar: 'https://picsum.photos/200',
+  hobbies: ['Running', 'Reading', 'Meditation'],
   stats: {
     goalsCompleted: 3,
     currentStreak: 12,
